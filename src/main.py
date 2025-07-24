@@ -1,42 +1,60 @@
 #!/usr/bin/env python3
-import uvicorn
 from dotenv import load_dotenv
-from typing import Annotated, List
-from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import SQLModel, Session, create_engine, text, select
-
-from src.db import init_db
-from src.models import User
-from config.app_settings import settings
-
 load_dotenv()
 
-app = FastAPI()
+from typing import List, Dict
+from contextlib import asynccontextmanager
 
-SessionDep = Annotated[Session, Depends(get_session)] ## this is to type the session
+import uvicorn
+from sqlmodel import select
+from sqlalchemy.exc import SQLAlchemyError
+from fastapi import FastAPI, HTTPException
+
+from models import UserCreate, UserRead
+from lib.db import init_db, SessionDep
+from config.app_settings import settings
+from config.http_status import HTTPStatus
+from services.user_services import create_user, get_users
 
 
-@app.on_event('startup')
-    def on_startup():
-        init_db()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
 
 
 @app.get('/checkhealth')
-async def checkhealth(session: SessionDep):
+async def checkhealth(session: SessionDep) -> Dict[str, bool]:
     try:
-        session.exec(text("SELECT 1"))
+        session.exec(select(1))
         return {'db': True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
 
 
-@app.get("/users/", response_model=List[User])
-def read_users(session: SessionDep):
-    """
-    Retrieves all users from the database.
-    """
-    users = session.exec(select(User)).all()
+@app.get("/users", response_model=List[UserRead])
+async def read_users(session: SessionDep):
+    """Get all users from the database"""
+    users = get_users(session)
     return users
+
+
+@app.post('/users', response_model=UserRead)
+async def create_users(user: UserCreate, session: SessionDep):
+    """Creates a new user"""
+    try:
+        user_created = create_user(user, session)
+        return user_created
+    except SQLAlchemyError as e:
+        raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Failed to create user"
+            ) from e
 
 
 if __name__ == "__main__":

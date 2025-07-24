@@ -1,0 +1,7 @@
+{
+  "inlayHints": {
+    "functionReturnTypes": false,
+    "variableTypes": false,
+    "parameterTypes": false
+  }
+}
