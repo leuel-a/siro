@@ -1,4 +1,5 @@
 from typing import Dict
+from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Field, SQLModel
 
 
@@ -12,6 +13,17 @@ class UserBase(SQLModel):
     """
     name: str = Field(index=True)
     email: str = Field(unique=True)
+
+
+class UserLogin(BaseModel):
+    """
+    Data Transfer Object (DTO) for login a user
+
+    :param email: The user's email address
+    :param password: The user's hashed password
+    """
+    email: str = PydanticField()
+    password: str = PydanticField()
 
 
 class UserCreate(UserBase):
@@ -31,6 +43,7 @@ class UserRead(UserBase):
     Inherits:
         name, and email fields from UserBase.
     """
+    id: int
     pass
 
 
@@ -41,7 +54,10 @@ class User(UserBase, table=True):
     :param id: The user's unique ID (primary key).
     Inherits all fields from UserBase.
     """
+    __table_args__ = {"extend_existing": True}
+
     id: int | None = Field(default=None, primary_key=True)
+    password: str
 
 
     def to_dict(self) -> Dict:
