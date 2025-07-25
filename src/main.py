@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
+import os
+import sys
 from dotenv import load_dotenv
-load_dotenv()
 
-from typing import List, Dict
+
+load_dotenv()
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+from typing import Dict
 from contextlib import asynccontextmanager
 
 import uvicorn
 from sqlmodel import select
-from sqlalchemy.exc import SQLAlchemyError
 from fastapi import FastAPI, HTTPException
 
-from models import UserCreate, UserRead
-from lib.db import init_db, SessionDep
-from config.app_settings import settings
-from config.http_status import HTTPStatus
-from services.user_services import create_user, get_users
-
+from src.lib.db import init_db, SessionDep
+from src.routes import user_router, auth_router
+from src.config.app_settings import settings
 
 
 @asynccontextmanager
@@ -27,7 +28,6 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-
 @app.get('/checkhealth')
 async def checkhealth(session: SessionDep) -> Dict[str, bool]:
     try:
@@ -36,25 +36,10 @@ async def checkhealth(session: SessionDep) -> Dict[str, bool]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
 
+API_PREFIX = '/api'
 
-@app.get("/users", response_model=List[UserRead])
-async def read_users(session: SessionDep):
-    """Get all users from the database"""
-    users = get_users(session)
-    return users
-
-
-@app.post('/users', response_model=UserRead)
-async def create_users(user: UserCreate, session: SessionDep):
-    """Creates a new user"""
-    try:
-        user_created = create_user(user, session)
-        return user_created
-    except SQLAlchemyError as e:
-        raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Failed to create user"
-            ) from e
+app.include_router(auth_router.router, prefix=f"{API_PREFIX}/auth", tags=["Auth"])
+app.include_router(user_router.router, prefix=f"{API_PREFIX}/users", tags=["Users"])
 
 
 if __name__ == "__main__":

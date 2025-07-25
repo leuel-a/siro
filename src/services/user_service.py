@@ -1,8 +1,9 @@
 from sqlmodel import select
 
-from models import User, UserCreate
-from lib.db import SessionDep
-from lib.utils import hash_password
+from src.models import User
+from src.lib.db import SessionDep
+from src.models.user import UserCreate
+from src.lib.utils import hash_password
 
 
 def get_users(session: SessionDep):
@@ -13,7 +14,7 @@ def get_users(session: SessionDep):
     :return: A list of all users in the database.
     """
     users = session.exec(select(User)).all()
-    return [user.to_dict() for user in users]
+    return [user for user in users]
 
 
 
@@ -32,5 +33,5 @@ def create_user(user: UserCreate, session: SessionDep):
     session.commit()
     session.refresh(user_to_db)
 
-    return user_to_db.to_dict()
+    return user_to_db
 
